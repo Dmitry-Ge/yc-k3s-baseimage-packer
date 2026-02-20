@@ -1,0 +1,45 @@
+#cloud-config
+write_files:
+  # 1. Конфигурационный файл k3s
+  - path: /etc/rancher/k3s/config.yaml
+    content: |
+      token: my_str0ng_s3cret_k3y
+      cluster-cidr: 10.42.0.0/16
+      service-cidr: 10.43.0.0/16
+      # Если это не первый мастер, раскомментируйте и укажите адрес первого:
+      # server: https://10.131.0.10:6443
+    permissions: '0600'
+
+  # 2. Systemd служба для сервера
+  - path: /etc/systemd/system/k3s.service
+    content: |
+      [Unit]
+      Description=Lightweight Kubernetes
+      Documentation=https://k3s.io
+      Wants=network-online.target
+      After=network-online.target
+      
+      [Service]
+      Type=notify
+      EnvironmentFile=-/etc/systemd/system/k3s.service.env
+      KillMode=process
+      Delegate=yes
+      LimitNOFILE=1048576
+      LimitNPROC=infinity
+      LimitCORE=infinity
+      TasksMax=infinity
+      TimeoutStartSec=0
+      Restart=always
+      RestartSec=5s
+      ExecStartPre=-/sbin/modprobe br_netfilter
+      ExecStartPre=-/sbin/modprobe overlay
+      ExecStart=/usr/local/bin/k3s server
+      ExecReload=/bin/kill -s HUP $MAINPID
+      
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - systemctl daemon-reload
+  - systemctl enable k3s.service
+  - systemctl start k3s.service
